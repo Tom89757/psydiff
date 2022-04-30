@@ -62,7 +62,7 @@ def length(ls):
 def remove(x, ls):
     ret = nil
     for y in ls:
-        if x <> y:
+        if x != y:
             ret = Pair(y, ret)
     return reverse(ret)
 
@@ -109,7 +109,7 @@ def filterlist(f, ls):
 #     i = 0
 #     while i < len(lists):
 #         ls = lists[i]
-#         while ls <> nil:
+#         while ls != nil:
 #             ret = Pair(ls.fst, ret)
 #             ls = ls.snd
 #         i += 1
@@ -134,7 +134,7 @@ def assq(x, s):
 
 def ziplist(ls1, ls2):
     ret = nil
-    while ls1 <> nil and ls2 <> nil:
+    while ls1 != nil and ls2 != nil:
         ret = Pair(Pair(ls1.fst, ls2.fst), ret)
         ls1 = ls1.snd
         ls2 = ls2.snd
@@ -148,7 +148,7 @@ def ext(x, v, s):
 
 def lookup(x, s):
     p = assq(x, s)
-    if p <> None:
+    if p != None:
         return p.snd
     else:
         return None

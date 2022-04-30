@@ -91,7 +91,7 @@ def mkList(pylist):
 
 def toList(ls):
     ret = []
-    while ls <> nil:
+    while ls != nil:
         ret.append(ls.first)
         ls = ls.rest
     return ret
@@ -115,7 +115,7 @@ def append(ls1, ls2):
 
 
 def assq(x, s):
-    while s <> nil:
+    while s != nil:
         if x == s.first.first:
             return s.first
         else:
@@ -134,7 +134,7 @@ def assq(x, s):
 # position to other functions.
 def lookup(x, s):
     p = assq(x, s)
-    if p <> None:
+    if p != None:
         return p.snd
     else:
         return None
@@ -155,7 +155,7 @@ def cmap(f, ls):
 # reverse is unchanged
 def reverse(ls):
     ret = nil
-    while ls <> nil:
+    while ls != nil:
         ret = Cons(ls.first, ret)
         ls = ls.rest
     return ret
@@ -168,7 +168,7 @@ def reverse(ls):
 # the same function.
 def cfilter(f, ls):
     ret = nil
-    while ls <> nil:
+    while ls != nil:
         if f(ls.first):
             ret = Cons(ls.first, ret)
         ls = ls.rest

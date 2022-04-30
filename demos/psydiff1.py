@@ -35,7 +35,7 @@ IS = isinstance
 
 def debug(*args):
     if DEBUG:
-        print args
+        print (args)
 
 
 def dot():
@@ -131,7 +131,7 @@ def parseFile(filename):
 def nodeFields(node):
     ret = []
     for field in node._fields:
-        if field <> 'ctx' and hasattr(node, field):
+        if field != 'ctx' and hasattr(node, field):
             ret.append(getattr(node, field))
     return ret
 
@@ -205,7 +205,7 @@ def sameDef(node1, node2):
 
 def differentDef(node1, node2):
     if isDef(node1) and isDef(node2):
-        return node1.name <> node2.name
+        return node1.name != node2.name
     return False
 
 
@@ -232,7 +232,7 @@ def nodeFramed(node, changes):
 def serializeIf(node):
     if IS(node, If):
         if not hasattr(node, 'nodeEnd'):
-            print "has no end:", node
+            print ("has no end:", node)
 
         newif = If(node.test, node.body, [])
         newif.lineno = node.lineno
@@ -263,7 +263,7 @@ def nodeName(node):
 def attr2str(node):
     if IS(node, Attribute):
         vName = attr2str(node.value)
-        if vName <> None:
+        if vName != None:
             return vName + "." + node.attr
         else:
             return None
@@ -304,7 +304,7 @@ def nodeSize(node, test=False):
         ret = 0
 
     if test:
-        print "node:", node, "size=", ret
+        print ("node:", node, "size=", ret)
 
     if IS(node, AST):
         node.nodeSize = ret
@@ -418,11 +418,11 @@ def clearStrDistCache():
 ### string distance function
 def strDist(s1, s2):
     cached = strDistCache.get((s1, s2))
-    if cached <> None:
+    if cached != None:
         return cached
 
     if len(s1) > 100 or len(s2) > 100:
-        if s1 <> s2:
+        if s1 != s2:
             return 2.0
         else:
             return 0
@@ -443,7 +443,7 @@ def dist1(table, s1, s2):
         return v
 
     cached = tableLookup(table, len(s1), len(s2))
-    if (cached <> None):
+    if (cached != None):
         return cached
 
     if s1 == '':
@@ -474,17 +474,17 @@ stat.diffCount = 0
 def diffNode(node1, node2, env1, env2, depth, move):
 
     # try substructural diff
-    def trysub((changes, cost)):
+    def trysub(changes, cost):
         if not move:
-            return (changes, cost)
+            return changes, cost
         elif canMove(node1, node2, cost):
-            return (changes, cost)
+            return changes, cost
         else:
             mc1 = diffSubNode(node1, node2, env1, env2, depth, move)
-            if mc1 <> None:
+            if mc1 != None:
                 return mc1
             else:
-                return (changes, cost)
+                return changes, cost
 
     if IS(node1, list) and not IS(node2, list):
         return diffNode(node1, [node2], env1, env2, depth, move)
@@ -519,7 +519,7 @@ def diffNode(node1, node2, env1, env2, depth, move):
     if (IS(node1, Name) and IS(node2, Name)):
         v1 = lookup(node1.id, env1)
         v2 = lookup(node2.id, env2)
-        if v1 <> v2 or (v1 == None and v2 == None):
+        if v1 != v2 or (v1 == None and v2 == None):
             cost = strDist(node1.id, node2.id)
             return (modifyNode(node1, node2, cost), cost)
         else:                           # same variable
@@ -530,7 +530,7 @@ def diffNode(node1, node2, env1, env2, depth, move):
         IS(node1, Attribute) and IS(node2, Attribute)):
         s1 = attr2str(node1)
         s2 = attr2str(node2)
-        if s1 <> None and s2 <> None:
+        if s1 != None and s2 != None:
             cost = strDist(s1, s2)
             return (modifyNode(node1, node2, cost), cost)
         # else fall through for things like f(x).y vs x.y
@@ -620,7 +620,7 @@ def diffFunctionDef(node1, node2, env1, env2, depth, move):
     for i in xrange(minlen):
         a1 = node1.args.args[i]
         a2 = node2.args.args[i]
-        if IS(a1, Name) and IS(a2, Name) and a1.id <> a2.id:
+        if IS(a1, Name) and IS(a2, Name) and a1.id != a2.id:
             env1 = ext(a1.id, a2, env1)
             env2 = ext(a2.id, a2, env2)
         (m1, c1) = diffNode(a1, a2, env1, env2, depth, move)
@@ -628,7 +628,7 @@ def diffFunctionDef(node1, node2, env1, env2, depth, move):
 
     # handle rest of the positionals
     ca = 0
-    if rest <> []:
+    if rest != []:
         if len1 < len2:
             for arg in rest:
                 ma = append(insNode(arg), ma)
@@ -641,30 +641,30 @@ def diffFunctionDef(node1, node2, env1, env2, depth, move):
     # vararg
     va1 = node1.varargName
     va2 = node2.varargName
-    if va1 <> None and va2 <> None:
-        if va1.id <> va2.id:
+    if va1 != None and va2 != None:
+        if va1.id != va2.id:
             env1 = ext(va1.id, va2, env1)
             env2 = ext(va2.id, va2, env2)
         cost = strDist(va1.id, va2.id)
         ma = append(modifyNode(va1, va2, cost), ma)
         ca += cost
-    elif va1 <> None or va2 <> None:
-        cost = nodeSize(va1) if va1 <> None else nodeSize(va2)
+    elif va1 != None or va2 != None:
+        cost = nodeSize(va1) if va1 != None else nodeSize(va2)
         ma = append(modifyNode(va1, va2, cost), ma)
         ca += cost
 
     # kwarg
     ka1 = node1.kwargName
     ka2 = node2.kwargName
-    if ka1 <> None and ka2 <> None:
-        if ka1.id <> ka2.id:
+    if ka1 != None and ka2 != None:
+        if ka1.id != ka2.id:
             env1 = ext(ka1.id, ka2, env1)
             env2 = ext(ka2.id, ka2, env2)
         cost = strDist(ka1.id, ka2.id)
         ma = append(modifyNode(ka1, ka2, cost), ma)
         ca += cost
-    elif ka1 <> None or ka2 <> None:
-        cost = nodeSize(ka1) if ka1 <> None else nodeSize(ka2)
+    elif ka1 != None or ka2 != None:
+        cost = nodeSize(ka1) if ka1 != None else nodeSize(ka2)
         ma = append(modifyNode(ka1, ka2, cost), ma)
         ca += cost
 
@@ -675,7 +675,7 @@ def diffFunctionDef(node1, node2, env1, env2, depth, move):
 
     # sum up cost. penalize functions with different names.
     cost = ca + cd + cb + strDist(node1.name, node2.name)
-    if node1.name <> node2.name:
+    if node1.name != node2.name:
         cost = cost * NAME_PENALTY
 
     return (append(ma, md, mb), cost)
@@ -727,13 +727,13 @@ def diffList(table, ls1, ls2, env1, env2, depth, move):
 
     # cache look up
     cached = tableLookup(table, len(ls1), len(ls2))
-    if (cached <> None):
+    if (cached != None):
         return cached
 
     if (ls1 == [] and ls2 == []):
         return memo((nil, 0))
 
-    elif (ls1 <> [] and ls2 <> []):
+    elif (ls1 != [] and ls2 != []):
         return memo(guess(table, ls1, ls2, env1, env2))
 
     elif ls1 == []:
@@ -882,7 +882,7 @@ def closure(res):
     matched = None
     moveround = 1
 
-    while moveround <= MOVE_ROUND and matched <> []:
+    while moveround <= MOVE_ROUND and matched != []:
         (matched, newChanges, c) = getmoves(changes, moveround)
         moveround += 1
         # print "matched:", matched
@@ -953,7 +953,7 @@ def findNodeStart(node, s, idxmap):
 
     elif IS(node, BinOp):
         leftstart = findNodeStart(node.left, s, idxmap)
-        if leftstart <> None:
+        if leftstart != None:
             ret = leftstart
         else:
             ret = mapIdx(idxmap, node.lineno, node.col_offset)
@@ -963,7 +963,7 @@ def findNodeStart(node, s, idxmap):
             ret = mapIdx(idxmap, node.lineno, node.col_offset)
         else:                           # special case for """ strings
             i = mapIdx(idxmap, node.lineno, node.col_offset)
-            while i > 0 and i+2 < len(s) and s[i:i+3] <> '"""':
+            while i > 0 and i+2 < len(s) and s[i:i+3] != '"""':
                 i -= 1
             ret = i
     else:
@@ -972,7 +972,7 @@ def findNodeStart(node, s, idxmap):
     if ret == None and hasattr(node, 'lineno'):
         raise TypeError("got None for node that has lineno", node)
 
-    if IS(node, AST) and ret <> None:
+    if IS(node, AST) and ret != None:
         node.nodeStart = ret
 
     return ret
@@ -1006,7 +1006,7 @@ def findNodeEnd(node, s, idxmap):
             q = "'"
             i += 1
         else:
-            print "illegal:", i, s[i]
+            print ("illegal:", i, s[i])
         ret = endSeq(s, q, i)
 
     elif IS(node, Name):
@@ -1035,7 +1035,7 @@ def findNodeEnd(node, s, idxmap):
         ret = findNodeEnd(node.value, s, idxmap)
 
     elif IS(node, Return):
-        if node.value <> None:
+        if node.value != None:
             ret = findNodeEnd(node.value, s, idxmap)
         else:
             ret = findNodeStart(node, s, idxmap) + len('return')
@@ -1047,7 +1047,7 @@ def findNodeEnd(node, s, idxmap):
           IS(node, While) or
           IS(node, If) or
           IS(node, IfExp)):
-        if node.orelse <> []:
+        if node.orelse != []:
             ret = findNodeEnd(node.orelse, s, idxmap)
         else:
             ret = findNodeEnd(node.body, s, idxmap)
@@ -1083,9 +1083,9 @@ def findNodeEnd(node, s, idxmap):
         ret = matchParen(s, '{', '}', findNodeStart(node, s, idxmap));
 
     elif IS(node, TryExcept):
-        if node.orelse <> []:
+        if node.orelse != []:
             ret = findNodeEnd(node.orelse, s, idxmap)
-        elif node.handlers <> []:
+        elif node.handlers != []:
             ret = findNodeEnd(node.handlers, s, idxmap)
         else:
             ret = findNodeEnd(node.body, s, idxmap)
@@ -1114,7 +1114,7 @@ def findNodeEnd(node, s, idxmap):
     else:
         # print "[findNodeEnd] unrecognized node:", node, "type:", type(node)
         start = findNodeStart(node, s, idxmap)
-        if start <> None:
+        if start != None:
             ret = start + 3
         else:
             ret = None
@@ -1122,7 +1122,7 @@ def findNodeEnd(node, s, idxmap):
     if ret == None and hasattr(node, 'lineno'):
         raise TypeError("got None for node that has lineno", node)
 
-    if IS(node, AST) and ret <> None:
+    if IS(node, AST) and ret != None:
         node.nodeEnd = ret
 
     return ret
@@ -1153,7 +1153,7 @@ def addMissingNames(node, s, idxmap):
         node.nameName = str2Name(s, start, idxmap)
         node._fields += ('nameName',)
 
-        if node.args.vararg <> None:
+        if node.args.vararg != None:
             if len(node.args.args) > 0:
                 vstart = findNodeEnd(node.args.args[-1], s, idxmap)
             else:
@@ -1164,7 +1164,7 @@ def addMissingNames(node, s, idxmap):
             node.varargName = None
         node._fields += ('varargName',)
 
-        if node.args.kwarg <> None:
+        if node.args.kwarg != None:
             if len(node.args.args) > 0:
                 kstart = findNodeEnd(node.args.args[-1], s, idxmap)
             else:
@@ -1202,7 +1202,7 @@ def addMissingNames(node, s, idxmap):
         nameNames = []
         next = findNodeStart(node, s, idxmap) + len('import')
         name = str2Name(s, next, idxmap)
-        while name <> None and next < len(s) and s[next] <> '\n':
+        while name != None and next < len(s) and s[next] != '\n':
             nameNames.append(name)
             next = name.nodeEnd
             name = str2Name(s, next, idxmap)
@@ -1237,7 +1237,7 @@ def endSeq(s, pat, start):
 
 # find matching close paren from start
 def matchParen(s, open, close, start):
-    while s[start] <> open and start < len(s):
+    while s[start] != open and start < len(s):
         start += 1
     if start >= len(s):
         return len(s)
@@ -1335,7 +1335,7 @@ def convertOps(ops, s, start, idxmap):
 opsMap = {
     # compare:
     Eq     : '==',
-    NotEq  : '<>',
+    NotEq  : '!=',
     Lt     : '<',
     LtE    : '<=',
     Gt     : '>',
@@ -1482,7 +1482,7 @@ def changeTags(s, changes, side):
             else:
                 end = nodeEnd(key)
 
-            if r.orig <> None and r.cur <> None:
+            if r.orig != None and r.cur != None:
                 # <a ...> for change and move
                 tags.append(Tag(linkTagStart(r, side), start))
                 tags.append(Tag("</a>", end, start))
@@ -1675,10 +1675,10 @@ def describeChange(diff):
         ret = wrap + describeNode(diff.orig) + " deleted"
     elif diff.orig == None:
         ret = wrap + describeNode(diff.cur) + " inserted"
-    elif nodeName(diff.orig) <> nodeName(diff.cur):
+    elif nodeName(diff.orig) != nodeName(diff.cur):
         ret = (describeNode(diff.orig) +
                " renamed to " + describeNode(diff.cur) + sim)
-    elif diff.cost == 0 and diff.orig.lineno <> diff.cur.lineno:
+    elif diff.cost == 0 and diff.orig.lineno != diff.cur.lineno:
         ret = (describeNode(diff.orig) +
                " moved to " + describeNode(diff.cur) + sim)
     elif diff.cost == 0:
@@ -1757,12 +1757,12 @@ def diff(file1, file2, move=True):
                % (div(cost, total) * 100))                             + "\n"
     report += ("-----------------------------------------------------")   + "\n"
 
-    print report
+    print (report)
 
 
     #---------------------- generation HTML ---------------------
     # write left file
-    leftChanges = filterlist(lambda p: p.orig <> None, changes)
+    leftChanges = filterlist(lambda p: p.orig != None, changes)
     html1 = genHTML(lines1, leftChanges, 'left')
 
     outname1 = baseName1 + '.html'
@@ -1777,7 +1777,7 @@ def diff(file1, file2, move=True):
 
 
     # write right file
-    rightChanges = filterlist(lambda p: p.cur <> None, changes)
+    rightChanges = filterlist(lambda p: p.cur != None, changes)
     html2 = genHTML(lines2, rightChanges, 'right')
 
     outname2 = baseName2 + '.html'
@@ -1834,7 +1834,7 @@ lastCheckpoint = None
 def checkpoint(init=None):
     import time
     global lastCheckpoint
-    if init <> None:
+    if init != None:
         lastCheckpoint = init
         return None
     else:
@@ -1852,15 +1852,15 @@ def checkpoint(init=None):
 ## text-based main command
 def printDiff(file1, file2):
     (m, c) = diffFile(file1, file2)
-    print "----------", file1, "<<<", c, ">>>", file2, "-----------"
+    print ("----------", file1, "<<<", c, ">>>", file2, "-----------")
 
     ms = pylist(m)
     ms = sorted(ms, key=lambda d: nodeStart(d.orig))
-    print "\n-------------------- changes(", len(ms), ")---------------------- "
+    print ("\n-------------------- changes(", len(ms), ")---------------------- ")
     for m0 in ms:
-        print m0
+        print (m0)
 
-    print "\n-------------------  end  ----------------------- "
+    print ("\n-------------------  end  ----------------------- ")
 
 
 
@@ -1878,7 +1878,7 @@ def iter_fields(node):
     """Iterate over all existing fields, excluding 'ctx'."""
     for field in node._fields:
         try:
-            if field <> 'ctx':
+            if field != 'ctx':
                 yield field, getattr(node, field)
         except AttributeError:
             pass
@@ -1959,7 +1959,7 @@ def printAst(node):
     elif (IS(node, Mult)):
         ret = '*'
     elif IS(node, NotEq):
-        ret = '<>'
+        ret = '!='
     elif (IS(node, Eq)):
         ret = '=='
     elif (IS(node, Pass)):

@@ -162,17 +162,17 @@ def dist1(table, s1, s2):
 def diff_node(node1, node2, depth, move):
 
     # try substructural diff
-    def trysub((changes, cost)):
+    def trysub(changes, cost):
         if not move:
-            return (changes, cost)
+            return changes, cost
         elif can_move(node1, node2, cost):
-            return (changes, cost)
+            return changes, cost
         else:
             mc1 = diff_subnode(node1, node2, depth, move)
             if mc1 is not None:
                 return mc1
             else:
-                return (changes, cost)
+                return changes, cost
 
     if isinstance(node1, list) and not isinstance(node2, list):
         node2 = [node2]
@@ -211,7 +211,7 @@ def diff_node(node1, node2, depth, move):
         isinstance(node1, Attribute) and isinstance(node2, Attribute)):
         s1 = attr_to_str(node1)
         s2 = attr_to_str(node2)
-        if s1 <> None and s2 <> None:
+        if s1 != None and s2 != None:
             cost = str_dist(s1, s2)
             return (mod_node(node1, node2, cost), cost)
         # else fall through for things like f(x).y vs x.y
@@ -293,7 +293,7 @@ def diff_list(table, ls1, ls2, depth, move):
     if (ls1 == [] and ls2 == []):
         return memo(([], 0))
 
-    elif (ls1 <> [] and ls2 <> []):
+    elif (ls1 != [] and ls2 != []):
         return memo(guess(table, ls1, ls2))
 
     elif ls1 == []:
@@ -434,7 +434,7 @@ def find_all_moves(res):
     matched = None
     moveround = 1
 
-    while moveround <= MOVE_ROUND and matched <> []:
+    while moveround <= MOVE_ROUND and matched != []:
         (matched, newChanges, c) = get_moves(changes, moveround)
         moveround += 1
         # print "matched:", matched
@@ -514,7 +514,7 @@ def diff(file1, file2, move=True):
                % (div(cost, total) * 100))                             + "\n"
     report += ("-----------------------------------------------------")   + "\n"
 
-    print report
+    print (report)
 
 
     #---------------------- generation HTML ---------------------
@@ -553,7 +553,7 @@ last_checkpoint = None
 def checkpoint(init=None):
     import time
     global last_checkpoint
-    if init <> None:
+    if init != None:
         last_checkpoint = init
         return None
     else:
@@ -571,15 +571,15 @@ def checkpoint(init=None):
 ## print the diffs as text
 def print_diff(file1, file2):
     (m, c) = diff_file(file1, file2)
-    print "----------", file1, "<<<", c, ">>>", file2, "-----------"
+    print ("----------", file1, "<<<", c, ">>>", file2, "-----------")
 
     ms = m
     ms = sorted(ms, key=lambda d: node_start(d.orig))
-    print "\n-------------------- changes(", len(ms), ")---------------------- "
+    print ("\n-------------------- changes(", len(ms), ")---------------------- ")
     for m0 in ms:
-        print m0
+        print (m0)
 
-    print "\n-------------------  end  ----------------------- "
+    print ("\n-------------------  end  ----------------------- ")
 
 
 

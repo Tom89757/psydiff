@@ -143,7 +143,7 @@ def filterlist(f, ls):
 
 def reverse(ls):
     ret = nil
-    while ls <> nil:
+    while ls != nil:
         ret = Cons(ls.first, ret)
         ls = ls.rest
     return ret
@@ -179,7 +179,7 @@ def assq(x, s):
 
 def ziplist(ls1, ls2):
     ret = nil
-    while ls1 <> nil and ls2 <> nil:
+    while ls1 != nil and ls2 != nil:
         ret = Pair(Pair(ls1.fst, ls2.fst), ret)
         ls1 = ls1.snd
         ls2 = ls2.snd
@@ -197,7 +197,7 @@ def ext(x, v, s):
 
 def lookup(x, s):
     p = assq(x, s)
-    if p <> None:
+    if p != None:
         return p.snd
     else:
         return None

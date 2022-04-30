@@ -1,0 +1,772 @@
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style>
+.d {                            /* deleted */
+    border: solid 1px #CC929A;
+    border-radius: 3px;
+    background-color: #FCBFBA;
+}
+
+.i {                            /* inserted */
+    border: solid 1px #73BE73;
+    border-radius: 3px;
+    background-color: #98FB98;
+}
+
+.c {                            /* changed */
+    border: solid 1px #8AADB8;
+    background-color: LightBlue;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.m {                            /* moved */
+    border: solid 1px #A9A9A9;
+    border-radius: 3px;
+    cursor: crosshair;
+}
+
+.mc {
+    border: solid 1px LightPink;
+    background-color: LightBlue;
+    cursor: pointer;
+}
+
+.u {                            /* unchanged */
+    border: solid 1px #A9A9A9;
+    border-radius: 4px;
+    cursor: crosshair;
+}
+
+span.lineno {
+    color: lightgrey;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+span.keyword {
+    /* color: #007070; */
+    font-weight: 700;
+}
+
+div.line {
+}
+
+div.src {
+    width:48%;
+    height:98%;
+    overflow:scroll;
+    float:left;
+    padding:0.5%;
+    border: solid 2px LightGrey;
+    border-radius: 5px;
+}
+
+
+div.stats {
+    border: solid 1px grey;
+    z-index: 1000;
+    width: 80%;
+    padding-left: 5%;
+}
+
+pre.stats {
+    color: grey;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+pre {
+    line-height: 200%;
+}
+
+p {
+    line-height: 200%;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+}
+
+</style>
+<script type="text/javascript">
+// convenience function for document.getElementById().
+window['$']=function(a){return document.getElementById(a)};
+
+
+/////////////////////// debug flag ////////////////////////
+var debug = false;
+
+
+/////////////////////// adjustable parameters //////////////////
+var minStep = 10;
+var nSteps = 30;
+var stepInterval = 10;
+var blockRange = 5;                    // how far consider one page blocked
+var nodeHLColor = '#C9B0A9';
+var lineHLColor = '#FFFF66';
+var lineBlockedColor = '#E9AB17';
+var bgColor = '';
+var bodyBlockedColor = '#FAF0E6';
+
+
+///////////////////////// globals ////////////////////////
+var eventCount = { 'left' : 0, 'right' : 0};
+var moving = false;
+var matchId1 = 'leftstart';
+var matchId2 = 'rightstart';
+var matchLineId1 = -1;
+var matchLineId2 = -1;
+var cTimeout;
+
+
+///////////////////////// utilities ///////////////////////
+
+// No Math.sign() in JS?
+function sign(x) {
+    if (x > 0) {
+        return 1;
+    } else if (x < 0) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+
+function log(msg) {
+    if (debug) {
+        console.log(msg);
+    }
+}
+
+
+
+function elementPosition(id) {
+    obj = $(id);
+    var curleft = 0, curtop = 0;
+
+    if (obj && obj.offsetParent) {
+        curleft = obj.offsetLeft;
+        curtop = obj.offsetTop;
+
+        while (obj = obj.offsetParent) {
+            curleft += obj.offsetLeft;
+            curtop += obj.offsetTop;
+        }
+    }
+
+    return { x: curleft, y: curtop };
+}
+
+
+/*
+ * Scroll the window to relative position, detecting blocking positions.
+ */
+function scrollWithBlockCheck(container, distX, distY) {
+    var oldTop = container.scrollTop;
+    var oldLeft = container.scrollLeft;
+
+    container.scrollTop += distY;      // the ONLY place for actual scrolling
+    container.scrollLeft += distX;
+
+    var actualX = container.scrollLeft - oldLeft;
+    var actualY = container.scrollTop - oldTop;
+    log("distY=" + distY + ", actualY=" + actualY);
+    log("distX=" + distX + ", actualX=" + actualX);
+
+    // extra leewaw here because Chrome scrolling is horribly inacurate
+    if ((Math.abs(distX) > blockRange && actualX === 0)
+        || Math.abs(distY) > blockRange && actualY === 0) {
+        log("blocked");
+        container.style.backgroundColor = bodyBlockedColor;
+        return true;
+    } else {
+        eventCount[container.id] += 1;
+        container.style.backgroundColor = bgColor;
+        return false;
+    }
+}
+
+
+function getContainer(elm) {
+    while (elm && elm.tagName !== 'DIV') {
+        elm = elm.parentElement || elm.parentNode;
+    }
+    return elm;
+}
+
+
+/*
+ * timed animation function for scrolling the current window
+ */
+function matchWindow(linkId, targetId, n)
+{
+    moving = true;
+
+    var link = $(linkId);
+    var target = $(targetId);
+    var linkContainer = getContainer(link);
+    var targetContainer = getContainer(target);
+
+    var linkPos = elementPosition(linkId).y - linkContainer.scrollTop;
+    var targetPos = elementPosition(targetId).y - targetContainer.scrollTop;
+    var distY = targetPos - linkPos;
+    var distX = linkContainer.scrollLeft - targetContainer.scrollLeft;
+
+
+    log("matching window... " + n + " distY=" + distY + " distX=" + distX);
+
+    if (distY === 0 && distX === 0) {
+        clearTimeout(cTimeout);
+        moving = false;
+    } else if (n <= 1) {
+        scrollWithBlockCheck(targetContainer, distX, distY);
+        moving = false;
+    } else {
+        var stepSize = Math.floor(Math.abs(distY) / n);
+        actualMinStep = Math.min(minStep, Math.abs(distY));
+        if (Math.abs(stepSize) < minStep) {
+            var step = actualMinStep * sign(distY);
+        } else {
+            var step = stepSize * sign(distY);
+        }
+        var blocked = scrollWithBlockCheck(targetContainer, distX, step);
+        var rest = Math.floor(distY / step) - 1;
+        log("blocked?" + blocked + ", rest steps=" + rest);
+        if (!blocked) {
+            cTimeout = setTimeout(function () {
+                return matchWindow(linkId, targetId, rest);
+            }, stepInterval);
+        } else {
+            clearTimeout(cTimeout);
+            moving = false;
+        }
+    }
+}
+
+
+function showArrow(linkId, targetId)
+{
+    var link = $(linkId);
+    var target = $(targetId);
+    var linkContainer = getContainer(link);
+    var targetContainer = getContainer(target);
+
+    var linkPos = elementPosition(linkId).y - linkContainer.scrollTop;
+    var targetPos = elementPosition(targetId).y - targetContainer.scrollTop;
+    var distY = targetPos - linkPos;
+    var distX = linkContainer.scrollLeft - targetContainer.scrollLeft;
+
+
+    log("targetPos = " + targetPos);
+}
+
+
+////////////////////////// highlighting /////////////////////////////
+
+var highlighted = []
+function putHighlight(id, color) {
+    var elm = $(id);
+    if (elm !== null) {
+        elm.style.backgroundColor = color;
+        if (color !== bgColor) {
+            highlighted.push(id);
+        }
+    }
+}
+
+
+function clearHighlight() {
+    for (i = 0; i < highlighted.length; i += 1) {
+        putHighlight(highlighted[i], bgColor);
+    }
+    highlighted = [];
+}
+
+
+
+/*
+ * Highlight the link, target nodes and their lines,
+ * then start animation to move the other window to match.
+ */
+function highlight(me, linkId, targetId)
+{
+    if (me.id === 'left') {
+        matchId1 = linkId;
+        matchId2 = targetId;
+    } else {
+        matchId1 = targetId;
+        matchId2 = linkId;
+    }
+
+    clearHighlight();
+
+    putHighlight(linkId, nodeHLColor);
+    putHighlight(targetId, nodeHLColor);
+}
+
+
+function instantMoveOtherWindow (me) {
+    log("me=" + me.id + ", eventcount=" + eventCount[me.id]);
+    log("matchId1=" + matchId1 + ", matchId2=" + matchId2);
+
+    me.style.backgroundColor = bgColor;
+
+    if (!moving && eventCount[me.id] === 0) {
+        if (me.id === 'left') {
+            matchWindow(matchId1, matchId2, 1);
+        } else {
+            matchWindow(matchId2, matchId1, 1);
+        }
+    }
+    if (eventCount[me.id] > 0) {
+        eventCount[me.id] -= 1;
+    }
+}
+
+
+function getTarget(x){
+    x = x || window.event;
+    return x.target || x.srcElement;
+}
+
+
+window.onload =
+    function (e) {
+        var tags = document.getElementsByTagName("A")
+        for (var i = 0; i < tags.length; i++) {
+            tags[i].onmouseover =
+                function (e) {
+                    var t = getTarget(e)
+                    var lid = t.id
+                    var tid = t.getAttribute('tid')
+                    var container = getContainer(t)
+                    highlight(container, lid, tid)
+                    showArrow(lid, tid)
+                }
+            tags[i].onclick =
+                function (e) {
+                    var t = getTarget(e)
+                    var lid = t.id
+                    var tid = t.getAttribute('tid')
+                    var container = getContainer(t)
+                    highlight(container, lid, tid)
+                    matchWindow(lid, tid, nSteps)
+                }
+        }
+
+        tags = document.getElementsByTagName("DIV")
+        for (var i = 0; i < tags.length; i++) {
+            tags[i].onscroll =
+                function (e) {
+                    instantMoveOtherWindow(getTarget(e))
+                }
+        }
+
+    }
+
+</script>
+</head>
+<body>
+<div id="left" class="src"><pre><a id="leftstart" tid="rightstart"></a>##################################################################
+# Demo for an AST-based diffing tool
+# author: Yin Wang (yinwang0@gmail.com)
+##################################################################
+
+##################################################################
+# Features:
+# - Detect insertion, deletion and modification of code
+# - Detect refactoring (renamed or moved code)
+# - Assess similarity of code
+# - Ignore comments and whitespaces
+#
+###################################################################
+# Usage:
+#
+# - Mouseover any framed elements to show information
+#
+# - Click on Blue or White elements to match the other side.
+#   Once matched, the two sides will be locked into that
+#   position until next match.
+#
+####################################################################
+# Legend of colors:
+#
+# - Red   : deleted
+# - Green : inserted
+# - Blue  : modified (mouse over to show percentage of change)
+# - White : unchanged or moved
+#
+###################################################################
+
+
+
+
+<a id='0' tid='1' class='c'>class <a id='2' tid='3' class='u'>Nil</a>:
+    <a id='4' tid='5' class='c'>def <a id='6' tid='7' class='u'>__repr__</a>(this):
+        return <a id='8' tid='9' class='u'>&quot;()&quot;</a></a></a>
+
+<a id='12' tid='13' class='u'>nil</a> = <a id='10' tid='11' class='u'>Nil</a>()            # singleton instance of Nil
+
+
+
+<a id='14' tid='15' class='c'>class <a id='16' tid='17' class='c'>Cons</a>:
+    <a id='18' tid='19' class='c'>def <a id='20' tid='21' class='u'>__init__</a>(this, first, rest):
+            <a id='24' tid='25' class='c'>this.first</a> = <a id='22' tid='23' class='c'>first</a>
+            <a id='28' tid='29' class='c'>this.rest</a> = <a id='26' tid='27' class='c'>rest</a></a>
+    <a id='30' tid='31' class='c'>def <a id='32' tid='33' class='u'>__repr__</a>(this):
+        if (<a id='50' tid='51' class='c'>this.rest</a> <a id='46' tid='47' class='u'>==</a> <a id='48' tid='49' class='u'>nil</a>):
+            return <a id='44' tid='45' class='u'>&quot;(&quot;</a> <a id='38' tid='39' class='u'>+</a> <a id='42' tid='43' class='u'>repr</a>(<a id='40' tid='41' class='c'>this.first</a>) <a id='34' tid='35' class='u'>+</a> <a id='36' tid='37' class='u'>&quot;)&quot;</a>
+        elif (<a id='88' tid='89' class='c'>IS</a>(<a id='84' tid='85' class='c'>this.rest</a>, <a id='86' tid='87' class='c'>Cons</a>)):
+            <a id='56' tid='57' class='u'>s</a> = <a id='54' tid='55' class='u'>repr</a>(<a id='52' tid='53' class='c'>this.rest</a>)
+            return <a id='82' tid='83' class='u'>&quot;(&quot;</a> <a id='76' tid='77' class='u'>+</a> <a id='80' tid='81' class='u'>repr</a>(<a id='78' tid='79' class='c'>this.first</a>) <a id='72' tid='73' class='u'>+</a> <a id='74' tid='75' class='u'>&quot; &quot;</a> <a id='62' tid='63' class='u'>+</a> <a id='70' tid='71' class='u'>s</a>[<a id='68' tid='69' class='u'>1</a>:<a id='64' tid='65' class='u'>-</a><a id='66' tid='67' class='u'>1</a>] <a id='58' tid='59' class='u'>+</a> <a id='60' tid='61' class='u'>&quot;)&quot;</a>
+        else:
+            return <a id='110' tid='111' class='u'>&quot;(&quot;</a> <a id='104' tid='105' class='u'>+</a> <a id='108' tid='109' class='u'>repr</a>(<a id='106' tid='107' class='c'>this.first</a>) <a id='100' tid='101' class='u'>+</a> <a id='102' tid='103' class='u'>&quot; . &quot;</a> <a id='94' tid='95' class='u'>+</a> <a id='98' tid='99' class='u'>repr</a>(<a id='96' tid='97' class='c'>this.rest</a>) <a id='90' tid='91' class='u'>+</a> <a id='92' tid='93' class='u'>&quot;)&quot;</a></a></a>
+
+
+
+
+<a id='112' tid='113' class='c'>def <a id='114' tid='115' class='u'>foldl</a>(f, x, ls):
+    <span class='d'>if ls == nil:
+        return x
+    else:
+        return <span class='d'>foldl(f, f(x, ls.first), ls.rest)</span></span></a>
+
+
+
+
+<a id='116' tid='117' class='c'>def <a id='118' tid='119' class='u'>length</a>(ls):
+    <span class='d'>if ls == nil:
+        return 0
+    else:
+        return <span class='d'>1 + length(ls.rest)</span></span></a>
+
+
+
+
+<span class='d'>def atomAssoc(u, v):
+    return Cons(Cons(u, v), nil)</span>
+
+
+
+
+<span class='d'>def mkList(pylist):
+    if (pylist == []):
+        return nil
+    else:
+        return Cons(pylist[0], mkList(pylist[1:]))</span>
+
+
+
+
+<span class='d'>def toList(ls):
+    ret = []
+    while ls != nil:
+        ret.append(ls.first)
+        ls = ls.rest
+    return ret</span>
+
+
+
+
+<span class='d'>def ext(x, v, s):
+    return Cons(Cons(x, v), s)</span>
+
+
+
+
+<a id='120' tid='121' class='c'>def <a id='122' tid='123' class='u'>append</a>(<span class='d'>ls1</span>, <span class='d'>ls2</span>):
+    <span class='d'>if (ls1 == nil):
+        return ls2
+    else:
+        return <a id='130' tid='131' class='c'>append</a>(<a id='124' tid='125' class='c'>ls1.rest</a>, <a id='128' tid='129' class='c'>Cons</a>(<a id='126' tid='127' class='c'>ls1.first</a>, <span class='d'>ls2</span>))</span></a>
+
+
+
+
+<a id='132' tid='133' class='c'>def <a id='134' tid='135' class='u'>assq</a>(x, s):
+    <span class='d'>while s != nil:
+        if x == s.first.first:
+            return s.first
+        else:
+            s = s.rest</span>
+    return Non</a>e
+
+    # if (s == nil):
+    #     return None
+    # elif (x == s.first.first):
+    #     return s.first
+    # else:
+    #     return assq(x, s.rest)
+
+
+# lookup is unchanged, but it is moved in relative
+# position to other functions.
+<a id='136' tid='137' class='u'>def <a id='138' tid='139' class='u'>lookup</a>(x, s):
+    <a id='146' tid='147' class='u'>p</a> = <a id='144' tid='145' class='u'>assq</a>(<a id='140' tid='141' class='u'>x</a>, <a id='142' tid='143' class='u'>s</a>)
+    if <a id='152' tid='153' class='u'>p</a> <a id='150' tid='151' class='u'>!=</a> None:
+        return <a id='148' tid='149' class='u'>p.snd</a>
+    else:
+        return Non</a>e
+
+
+
+# cmap was renamed to maplist, but the function
+# has been modified significantly since renaming.
+# Thus we no longer consider them to be the same
+# function.
+<span class='d'>def cmap(f, ls):
+    if (ls == nil):
+        return nil
+    else:
+        return Cons(f(ls.first), cmap(f, ls.rest))</span>
+
+
+# reverse is unchanged
+<span class='d'>def reverse(ls):
+    ret = nil
+    while ls != nil:
+        ret = Cons(ls.first, ret)
+        ls = ls.rest
+    return ret</span>
+
+
+
+# cfilter was renamed to filterlist, but the
+# function has been modified significantly since
+# renaming. Thus we no longer consider them to be
+# the same function.
+<span class='d'>def cfilter(f, ls):
+    ret = nil
+    while ls != nil:
+        if f(ls.first):
+            ret = Cons(ls.first, ret)
+        ls = ls.rest
+    return reverse(ret)</span>
+
+    # if (ls == nil):
+    #     return nil
+    # elif f(ls.first):
+    #     return Cons(ls.first, cfilter(f, ls.rest))
+    # else:
+    #     return cfilter(f, ls.rest)
+
+</pre></div><div id="right" class="src"><pre><a id="rightstart" tid="leftstart"></a>##################################################################
+# Demo for an AST-based diffing tool
+# author: Yin Wang (yinwang0@gmail.com)
+##################################################################
+
+##################################################################
+# Features:
+# - Detect insertion, deletion and modification of code
+# - Detect refactoring (renamed or moved code)
+# - Assess similarity of code
+# - Ignore comments and whitespaces
+#
+###################################################################
+# Usage:
+#
+# - Mouseover any framed elements to show information
+#
+# - Click on Blue or White elements to match the other side.
+#   Once matched, the two sides will be locked into that
+#   position until next match.
+#
+####################################################################
+# Legend of colors:
+#
+# - Red   : deleted
+# - Green : inserted
+# - Blue  : modified (mouse over to show percentage of change)
+# - White : unchanged or moved
+#
+###################################################################
+
+
+
+
+
+<span class='i'>class PairIterator:
+    def __init__(self, p):
+        self.p = p
+    def next(self):
+        if self.p == nil:
+            raise StopIteration
+        ret = self.p.fst
+        self.p = self.p.snd
+        return ret</span>
+
+
+
+
+<a id='1' tid='0' class='c'>class <a id='3' tid='2' class='u'>Nil</a>:
+    <a id='5' tid='4' class='c'>def <a id='7' tid='6' class='u'>__repr__</a>(self):
+        return <a id='9' tid='8' class='u'>&quot;()&quot;</a></a>
+    <span class='i'>def __iter__(self):
+        return PairIterator(self)</span></a>
+
+<a id='13' tid='12' class='u'>nil</a> = <a id='11' tid='10' class='u'>Nil</a>()            # singleton instance of Nil
+
+
+
+
+<a id='15' tid='14' class='c'>class <a id='17' tid='16' class='c'>Pair</a>:
+    <a id='19' tid='18' class='c'>def <a id='21' tid='20' class='u'>__init__</a>(self, fst, snd):
+            <a id='25' tid='24' class='c'>self.fst</a> = <a id='23' tid='22' class='c'>fst</a>
+            <a id='29' tid='28' class='c'>self.snd</a> = <a id='27' tid='26' class='c'>snd</a></a>
+    <a id='31' tid='30' class='c'>def <a id='33' tid='32' class='u'>__repr__</a>(self):
+        if (<a id='51' tid='50' class='c'>self.snd</a> <a id='47' tid='46' class='u'>==</a> <a id='49' tid='48' class='u'>nil</a>):
+            return <a id='45' tid='44' class='u'>&quot;(&quot;</a> <a id='39' tid='38' class='u'>+</a> <a id='43' tid='42' class='u'>repr</a>(<a id='41' tid='40' class='c'>self.fst</a>) <a id='35' tid='34' class='u'>+</a> <a id='37' tid='36' class='u'>&quot;)&quot;</a>
+        elif (<a id='89' tid='88' class='c'>isinstance</a>(<a id='85' tid='84' class='c'>self.snd</a>, <a id='87' tid='86' class='c'>Pair</a>)):
+            <a id='57' tid='56' class='u'>s</a> = <a id='55' tid='54' class='u'>repr</a>(<a id='53' tid='52' class='c'>self.snd</a>)
+            return <a id='83' tid='82' class='u'>&quot;(&quot;</a> <a id='77' tid='76' class='u'>+</a> <a id='81' tid='80' class='u'>repr</a>(<a id='79' tid='78' class='c'>self.fst</a>) <a id='73' tid='72' class='u'>+</a> <a id='75' tid='74' class='u'>&quot; &quot;</a> <a id='63' tid='62' class='u'>+</a> <a id='71' tid='70' class='u'>s</a>[<a id='69' tid='68' class='u'>1</a>:<a id='65' tid='64' class='u'>-</a><a id='67' tid='66' class='u'>1</a>] <a id='59' tid='58' class='u'>+</a> <a id='61' tid='60' class='u'>&quot;)&quot;</a>
+        else:
+            return <a id='111' tid='110' class='u'>&quot;(&quot;</a> <a id='105' tid='104' class='u'>+</a> <a id='109' tid='108' class='u'>repr</a>(<a id='107' tid='106' class='c'>self.fst</a>) <a id='101' tid='100' class='u'>+</a> <a id='103' tid='102' class='u'>&quot; . &quot;</a> <a id='95' tid='94' class='u'>+</a> <a id='99' tid='98' class='u'>repr</a>(<a id='97' tid='96' class='c'>self.snd</a>) <a id='91' tid='90' class='u'>+</a> <a id='93' tid='92' class='u'>&quot;)&quot;</a></a>
+    <span class='i'>def __iter__(self):
+        return PairIterator(self)</span></a>
+
+
+
+
+<a id='113' tid='112' class='c'>def <a id='115' tid='114' class='u'>foldl</a>(f, x, ls):
+    <span class='i'>ret = x</span>
+    <span class='i'>for y in ls:
+        ret = f(ret, y)</span>
+    return <span class='i'>ret</span></a>
+
+
+
+
+<a id='117' tid='116' class='c'>def <a id='119' tid='118' class='u'>length</a>(ls):
+    <span class='i'>ret = 0</span>
+    <span class='i'>for x in ls:
+        ret = ret + 1</span>
+    return <span class='i'>ret</span></a>
+
+
+
+
+<span class='i'>def assoc(u, v):
+    return Pair(Pair(u, v), nil)</span>
+
+
+
+
+<span class='i'>def slist(pylist):
+    ret = nil
+    for i in xrange(len(pylist)):
+        ret = Pair(pylist[len(pylist)-i-1], ret)
+    return ret</span>
+
+
+
+
+<span class='i'>def pylist(ls):
+    ret = []
+    for x in ls:
+        ret.append(x)
+    return ret</span>
+
+
+
+# maplist was renamed from cmap, but the function
+# has been modified significantly since renaming.
+# Thus we no longer consider them to be the same
+# function.
+<span class='i'>def maplist(f, ls):
+    ret = nil
+    for x in ls:
+        ret = Pair(f(x), ret)
+    return reverse(ret)</span>
+
+
+
+# filterlist was renamed from cfilter, but the
+# function has been modified significantly since
+# renaming. Thus we no longer consider them to be
+# the same function.
+<span class='i'>def filterlist(f, ls):
+    ret = nil
+    for x in ls:
+        if f(x):
+            ret = Pair(x, ret)
+    return reverse(ret)</span>
+
+
+
+<span class='i'>def reverse(ls):
+    ret = nil
+    while ls != nil:
+        ret = Cons(ls.first, ret)
+        ls = ls.rest
+    return ret</span>
+
+# def reverse(ls):
+#     ret = nil
+#     for x in ls:
+#         ret = Pair(x, ret)
+#     return ret
+
+
+
+
+<a id='121' tid='120' class='c'>def <a id='123' tid='122' class='u'>append</a>(*<span class='i'><span class='i'>lis</span>ts</span>, **<span class='i'><span class='i'>kw</span>)</span>:
+    <span class='i'>def append1(ls1, ls2):
+        ret = ls2
+        for x in ls1:
+            ret = Pair(x, ret)
+        return ret</span>
+    return <a id='131' tid='130' class='c'>foldl</a>(<span class='i'>append1</span>, <a id='125' tid='124' class='c'>nil</a>, <a id='129' tid='128' class='c'>slist</a>(<a id='127' tid='126' class='c'>lists</a>))</a>
+
+
+
+
+<a id='133' tid='132' class='c'>def <a id='135' tid='134' class='u'>assq</a>(x, s):
+    <span class='i'>for p in s:
+        if x == p.fst:
+            return p</span>
+    return Non</a>e
+
+
+
+
+<span class='i'>def ziplist(ls1, ls2):
+    ret = nil
+    while ls1 != nil and ls2 != nil:
+        ret = Pair(Pair(ls1.fst, ls2.fst), ret)
+        ls1 = ls1.snd
+        ls2 = ls2.snd
+    return reverse(ret)</span>
+
+
+
+
+# building association lists
+<span class='i'>def ext(x, v, s):
+    return Pair(Pair(x, v), s)</span>
+
+
+
+
+<a id='137' tid='136' class='u'>def <a id='139' tid='138' class='u'>lookup</a>(x, s):
+    <a id='147' tid='146' class='u'>p</a> = <a id='145' tid='144' class='u'>assq</a>(<a id='141' tid='140' class='u'>x</a>, <a id='143' tid='142' class='u'>s</a>)
+    if <a id='153' tid='152' class='u'>p</a> <a id='151' tid='150' class='u'>!=</a> None:
+        return <a id='149' tid='148' class='u'>p.snd</a>
+    else:
+        return Non</a>e
+
+
+</pre></div></body>
+</html>
